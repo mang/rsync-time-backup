@@ -28,6 +28,24 @@ fn_terminate_script() {
 trap 'fn_terminate_script' SIGINT
 
 # -----------------------------------------------------------------------------
+# Small utility functions for reducing code duplication
+# -----------------------------------------------------------------------------
+
+fn_parse_date() {
+	# Converts YYYY-MM-DD-HHMMSS to YYYY-MM-DD HH:MM:SS and then to Unix Epoch.
+	date -d "${1:0:10} ${1:11:2}:${1:13:2}:${1:15:2}" +%s
+}
+
+fn_find_backups() {
+	find "$DEST_FOLDER" -type d -name "????-??-??-??????" -prune
+}
+
+fn_expire_backup() {
+	fn_log_info "Expiring $1"
+	rm -rf -- "$1"
+}
+
+# -----------------------------------------------------------------------------
 # Source and destination information
 # -----------------------------------------------------------------------------
 
@@ -75,13 +93,15 @@ fi
 # Setup additional variables
 # -----------------------------------------------------------------------------
 
-BACKUP_FOLDER_PATTERN=????-??-??-??????
+export IFS=$'\n' # Better for handling spaces in filenames.
 NOW=$(date +"%Y-%m-%d-%H%M%S")
 PROFILE_FOLDER="$HOME/.rsync_tmbackup"
 LOG_FILE="$PROFILE_FOLDER/$NOW.log"
 DEST=$DEST_FOLDER/$NOW
-PREVIOUS_DEST=$(find "$DEST_FOLDER" -type d -name "$BACKUP_FOLDER_PATTERN" -prune | sort | tail -n 1)
+PREVIOUS_DEST=$(fn_find_backups | sort | tail -n 1)
 INPROGRESS_FILE=$DEST_FOLDER/backup.inprogress
+KEEP_ALL_DATE=$(date -d '-1 day' +%s)
+KEEP_DAILIES_DATE=$(date -d '-1 month' +%s)
 
 # -----------------------------------------------------------------------------
 # Create profile folder if it doesn't exist
@@ -101,10 +121,10 @@ if [ -f "$INPROGRESS_FILE" ]; then
 		# - Last backup is moved to current backup folder so that it can be resumed.
 		# - 2nd to last backup becomes last backup.
 		fn_log_info "$INPROGRESS_FILE already exists - the previous backup failed or was interrupted. Backup will resume from there."
-		LINE_COUNT=$(find "$DEST_FOLDER" -type d -name "$BACKUP_FOLDER_PATTERN" -prune | sort | tail -n 2 | wc -l)
+		LINE_COUNT=$(fn_find_backups | sort | tail -n 2 | wc -l)
 		mv -- "$PREVIOUS_DEST" "$DEST"
 		if [ "$LINE_COUNT" -gt 1 ]; then
-			PREVIOUS_PREVIOUS_DEST=$(find "$DEST_FOLDER" -type d -name "$BACKUP_FOLDER_PATTERN" -prune | sort | tail -n 2 | head -n 1)
+			PREVIOUS_PREVIOUS_DEST=$(fn_find_backups | sort | tail -n 2 | head -n 1)
 			PREVIOUS_DEST=$PREVIOUS_PREVIOUS_DEST
 		else
 			PREVIOUS_DEST=""
@@ -138,6 +158,32 @@ while [ "1" ]; do
 		fn_log_info "Creating destination $DEST"
 		mkdir -p -- "$DEST"
 	fi
+
+	# -----------------------------------------------------------------------------
+	# Purge certain old backups before beginning new backup.
+	# -----------------------------------------------------------------------------
+
+	for fname in $(fn_find_backups | sort -r); do
+		date=$(basename "$fname")
+		stamp=$(fn_parse_date $date)
+
+		# Skip if failed to parse date...
+		[ -n "$stamp" ] || continue
+
+		if   [ $stamp -ge $KEEP_ALL_DATE ]; then
+			true
+
+		elif [ $stamp -ge $KEEP_DAILIES_DATE ]; then
+			# Delete all but the most recent of each day.
+			[ ${date:8:2} -eq ${prev:8:2} ] && fn_expire_backup "$fname"
+
+		else
+			# Delete all but the most recent of each month.
+			[ ${date:5:2} -eq ${prev:5:2} ] && fn_expire_backup "$fname"
+		fi
+
+		prev=$date
+	done
 
 	# -----------------------------------------------------------------------------
 	# Start backup
@@ -203,13 +249,13 @@ while [ "1" ]; do
 
 		fn_log_warn "No space left on device - removing oldest backup and resuming."
 		
-		BACKUP_FOLDER_COUNT=$(find "$DEST_FOLDER" -type d -name "$BACKUP_FOLDER_PATTERN" -prune | wc -l)
+		BACKUP_FOLDER_COUNT=$(fn_find_backups | wc -l)
 		if [ "$BACKUP_FOLDER_COUNT" -lt "2" ]; then
 			fn_log_error "No space left on device, and no old backup to delete."
 			exit 1
 		fi
 				
-		OLD_BACKUP_PATH=$(find "$DEST_FOLDER" -type d -name "$BACKUP_FOLDER_PATTERN" -prune | head -n 1)
+		OLD_BACKUP_PATH=$(fn_find_backups | head -n 1)
 		if [ "$OLD_BACKUP_PATH" == "" ]; then
 			fn_log_error "No space left on device, and cannot get path to oldest backup to delete."
 			exit 1
@@ -222,8 +268,7 @@ while [ "1" ]; do
 			exit 1
 		fi
 		
-		fn_log_info "Deleting '$OLD_BACKUP_PATH'..."
-		rm -rf -- "$OLD_BACKUP_PATH"
+		fn_expire_backup "$OLD_BACKUP_PATH"
 		
 		# Resume backup
 		continue
