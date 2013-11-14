@@ -8,7 +8,7 @@ Time Machine style backup with rsync. Should work on Linux, Mac OS X and Windows
 
 # Usage
 
-	rsync_tmbackup.sh <source> <destination> [excluded-pattern-path]
+	rsync_tmbackup.sh <source> <destination> [included-pattern-path] [excluded-pattern-path]
 
 ## Examples
 	
@@ -18,11 +18,25 @@ Time Machine style backup with rsync. Should work on Linux, Mac OS X and Windows
 
 * Backup with exclusion list:
 	
-		rsync_tmbackup.sh /home /mnt/backup_drive excluded_patterns.txt
+		rsync_tmbackup.sh /home /mnt/backup_drive included_patterns.txt excluded_patterns.txt
 	
+## Include file
+
+An optional exclude file can be provided as a third parameter. It should be compabible with the `--include-from` parameter of rsync. To only copy /home you could do this:
+
+* included_patterns.txt
+
+		/home
+		/home/**
+
+* excluded_patterns.txt
+
+		*
+
 ## Exclude file
 
-An optional exclude file can be provided as a third parameter. It should be compabible with the `--exclude-from` parameter of rsync. See [this tutorial] (https://sites.google.com/site/rsync2u/home/rsync-tutorial/the-exclude-from-option) for more information.
+An optional exclude file can be provided as a fourth parameter. It should be compabible with the `--exclude-from` parameter of rsync. See [this tutorial] (https://sites.google.com/site/rsync2u/home/rsync-tutorial/the-exclude-from-option) for more information.
+
 
 # Features
 

@@ -33,9 +33,10 @@ trap 'fn_terminate_script' SIGINT
 
 SRC_FOLDER=${1%/}
 DEST_FOLDER=${2%/}
-EXCLUSION_FILE=$3
+INCLUSION_FILE=$3
+EXCLUSION_FILE=$4
 
-for arg in "$SRC_FOLDER" "$DEST_FOLDER" "$EXCLUSION_FILE"; do
+for arg in "$SRC_FOLDER" "$DEST_FOLDER" "$INCLUSION_FILE" "$EXCLUSION_FILE"; do
 	if [[ "$arg" == *"'"* ]]; then
 		fn_log_error 'Arguments may not have any single quote characters.'
 		exit 1
@@ -160,6 +161,10 @@ while [ "1" ]; do
 	CMD="$CMD --itemize-changes"
 	CMD="$CMD --verbose"
 	CMD="$CMD --log-file '$LOG_FILE'"
+	if [ "$INCLUSION_FILE" != "" ]; then
+		# We've already checked that $INCLUSION_FILE doesn't contain a single quote
+		CMD="$CMD --include-from '$INCLUSION_FILE'"
+	fi
 	if [ "$EXCLUSION_FILE" != "" ]; then
 		# We've already checked that $EXCLUSION_FILE doesn't contain a single quote
 		CMD="$CMD --exclude-from '$EXCLUSION_FILE'"
@@ -172,7 +177,7 @@ while [ "1" ]; do
 	fn_log_info "$CMD"
 
 	touch -- "$INPROGRESS_FILE"
-	eval $CMD
+	eval nice -n19 ionice -c3 nocache $CMD
 	RSYNC_EXIT_CODE=$?
 
 	# -----------------------------------------------------------------------------
