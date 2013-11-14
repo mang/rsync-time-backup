@@ -233,7 +233,10 @@ while [ "1" ]; do
 		fn_log_error "Exited with error code $RSYNC_EXIT_CODE"
 		exit $RSYNC_EXIT_CODE
 	fi
-	
+
+	rm -f $DEST_FOLDER/latest
+	ln -sr $DEST $DEST_FOLDER/latest
+
 	rm -- "$INPROGRESS_FILE"
 	# TODO: grep for "^rsync error:.*$" in log
 	fn_log_info "Backup completed without errors."
