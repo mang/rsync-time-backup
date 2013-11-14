@@ -156,7 +156,6 @@ while [ "1" ]; do
 	CMD="$CMD --hard-links"
 	CMD="$CMD --delete"
 	CMD="$CMD --delete-excluded"
-	CMD="$CMD --one-file-system"
 	CMD="$CMD --archive"
 	CMD="$CMD --itemize-changes"
 	CMD="$CMD --verbose"
