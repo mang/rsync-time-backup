@@ -54,7 +54,8 @@ fn_expire_backup() {
 	fn_log_info "Expiring $1"
 	TMP_EMPTY_DIR=$(mktemp -d /tmp/empty.XXXXXX)
 	rsync -a --delete $TMP_EMPTY_DIR/ "$1"
-  rmdir $TMP_EMPTY_DIR
+	rmdir "$1"
+	rmdir $TMP_EMPTY_DIR
 }
 
 # -----------------------------------------------------------------------------
